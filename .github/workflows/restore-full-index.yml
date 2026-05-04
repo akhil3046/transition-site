@@ -1,0 +1,35 @@
+name: Restore full homepage HTML
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore full index.html from packed loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, gzip, re
+          loader = Path('index.html').read_text(encoding='utf-8')
+          match = re.search(r"const packed = '([^']+)'", loader)
+          if not match:
+              raise SystemExit('Packed homepage was not found in index.html')
+          html = gzip.decompress(base64.b64decode(match.group(1))).decode('utf-8')
+          Path('index.html').write_text(html, encoding='utf-8')
+          PY
+          rm -f .github/workflows/restore-full-index.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Replace loader with full homepage HTML"
+          git push
